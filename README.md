@@ -10,6 +10,27 @@
 
 We design and create a framework for benchmarking and comparing Graph Neural Network (GNN) architectures implemented in a robust and reproducible way using the scientific workflow system Nextflow, popular with computational biologists. We include support for nine different GNN architectures on binary node classification tasks. To demonstrate the versatility of our framework, we consider a task of significant biological importance - that of identifying cancer-driver genes (CDG) in a protein-protein interaction (PPI) network. Data was sourced from the Pan-Cancer Analysis of Whole Genomes (PCAWG), the Pathway Indicated Drivers (PID), the COSMIC Cancer Gene Census (COSMIC-CGC), and STRING and BioGRID PPI databases. On this task, GNNs were able to effectively make use of the network structure of the data. Nevertheless, different architectures performed remarkably similar, emphasising the importance of the quality of the training data for such tasks. We make our pipeline publically available to enable other researchers to perform similar investigations into other areas of computational biology. We believe that this will lead to improved benchmarking standards in the GNN literature.
 
+# Paper
+
+If you use **GNN-Suite** in your research, please cite the following preprint:
+
+> **GNN-Suite: a Graph Neural Network Benchmarking Framework for Biomedical Informatics**  
+> Sebestyén Kamp, Giovanni Stracquadanio, T. Ian Simpson  
+> [arXiv:2505.10711](https://arxiv.org/abs/2505.10711), 2025  
+> DOI: [10.48550/arXiv.2505.10711](https://doi.org/10.48550/arXiv.2505.10711)
+
+```bibtex
+@article{kamp2025gnnsuite,
+  title     = {GNN-Suite: a Graph Neural Network Benchmarking Framework for Biomedical Informatics},
+  author    = {Kamp, Sebestyén and Stracquadanio, Giovanni and Simpson, T. Ian},
+  journal   = {arXiv preprint arXiv:2505.10711},
+  year      = {2025},
+  url       = {https://arxiv.org/abs/2505.10711},
+  doi       = {10.48550/arXiv.2505.10711}
+}
+```
+
+
 ## Models
 
 The following models are included:
@@ -155,9 +176,6 @@ You need to grant the necessary execution permissions to the specific python scr
 ```groovy
  chmod +x /home/<path>/code/gnn-suite/bin/plot.py
 ```
-## Paper
-
-- Forthcoming
 
 ## Authors
 
