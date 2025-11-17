@@ -41,7 +41,14 @@ process TrainGNN {
         tuple val(model), val(epoch), val("test"), path("full-${model}-${epoch}-run-${run}-test.txt"), emit: test_output
         tuple val(model), val(epoch), val("all"), path("full-${model}-${epoch}-run-${run}-all.txt"), emit: all_output
 
-    """
+    """ 
+        export WITH_MLFLOW=${params.with_mlflow?: '0'}
+        export MLFLOW_TRACKING_URI=${params.mlflow_tracking_uri ?: "file:${resultsDir}/mlruns"}
+        export MLFLOW_EXPERIMENT_NAME=${params.mlflow_experiment_name ?: "gnn-binary-classification"}
+
+        export MODEL=${model}
+
+
         gnn.py ${geneFile} ${networkFile} \
                 --train-size ${params.train_size} \
                 --model-name ${model} \
@@ -161,6 +168,15 @@ workflow {
     // benchmark channel
     benchmarkChan = geneChan.combine(networkChan).combine(modelChan).combine(epochChan) 
     
+
+    [gene, network, gcn, 10]
+
+    [gene, network, gcn, 15]
+
+    [gene, network, gat, 10]
+
+    [gene, network, gat, 15]
+
     // train the GNN
     results = TrainGNN(benchmarkChan, replicatesChan)
     //results.train_output.view()

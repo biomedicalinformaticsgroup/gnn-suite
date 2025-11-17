@@ -2,6 +2,7 @@
 import sys
 import typer
 import csv
+import os
 
 import numpy as np
 from sklearn import metrics, model_selection
@@ -10,7 +11,12 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.data import Data
 
+import mlflow
+
 from models import GCN, GAT, HGCN, PHGCN, GraphSAGE, GraphIsomorphismNetwork, GCNII, GraphTransformer
+
+WITH_MLFLOW = os.environ.get("WITH_MLFLOW", "0") == "1"
+
 
 
 def read_gene_file(gene_filename):
@@ -364,23 +370,36 @@ def run(
     eval_threshold: float = 0.9,
     verbose_interval: int = 10,
     dropout: float = 0.5,
-    alpha: float = 0.1, 
+    alpha: float = 0.1,
     theta: float = 0.5
 ):
     """
-    Train a graph neural network.
+    Train a graph neural network with MLflow tracking for binary classification.
 
     Parameters:
     - gene_filename: Path to the gene file.
     - network_filename: Path to the network file.
     - train_size: Proportion of the dataset to include in the train split.
     - model_name: Name of the model to train.
-    - num_epochs: Number of training epochs.
+    - epochs: Number of training epochs.
     - learning_rate: Learning rate for the optimizer.
     - weight_decay: Weight decay for the optimizer.
     - eval_threshold: Threshold for quantile function in evaluation.
     - verbose_interval: Interval for printing training progress.
+    - dropout: Dropout rate for regularization.
+    - alpha: Alpha parameter (for GCN2).
+    - theta: Theta parameter (for GCN2).
     """
+    if WITH_MLFLOW:
+        tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "file:./mlruns")
+        experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "gnn-binary-classification")
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_experiment(experiment_name)
+
+        run_name = f"{model_name}"
+
+        mlflow.start_run(run_name=run_name)
+
     # Load the data
     data = load_data(gene_filename, network_filename, train_size)
 
@@ -404,6 +423,21 @@ def run(
     optimizer = torch.optim.Adam(
         model.parameters(), lr=learning_rate, weight_decay=weight_decay
     )
+
+    if WITH_MLFLOW:
+        mlflow.log_params({
+            "model": model_name,
+            "learning_rate": learning_rate,
+            "weight_decay": weight_decay,
+            "dropout": dropout,
+            "alpha": alpha,
+            "theta": theta,
+            "epochs": epochs,
+            "train_size": train_size,
+            "eval_threshold": eval_threshold
+        })
+        mlflow.set_tag("task_type", "binary")
+        mlflow.set_tag("model_name", model_name)
 
     # Compute the weight for positive samples
     pos_weight = compute_positive_sample_weight(data)
@@ -431,6 +465,9 @@ def run(
     for epoch in range(1, epochs + 1):
         loss = train(model, data, optimizer, weight=pos_weight)
 
+        if WITH_MLFLOW:
+            mlflow.log_metric("train_loss", float(loss), step=epoch)
+
         # Evaluate the model and print the results at the specified interval
         if (epoch % verbose_interval == 0) or (epoch == 1):
             tn, fp, fn, tp, precision, recall, acc, bacc, auc = evaluate(
@@ -448,8 +485,15 @@ def run(
                 )
             )
 
-            # Append the balanced accuracy to the array for hyperparameter search
+            # Append the balanced accuracy to the array
             bacc_array.append(bacc)
+
+            if WITH_MLFLOW:
+                mlflow.log_metric("val_bacc", bacc, step=epoch)
+                mlflow.log_metric("val_precision", precision, step=epoch)
+                mlflow.log_metric("val_recall", recall, step=epoch)
+                mlflow.log_metric("val_auc", auc, step=epoch)
+                mlflow.log_metric("val_accuracy", acc, step=epoch)
 
             print(
                 "Train: {:>10} {:>10.5g} {:>10} {:>10} {:>10} {:>10} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
@@ -462,8 +506,17 @@ def run(
                 )
             )
 
-    # return the max of the balanced accuracy array
+    # Get the max balanced accuracy
     max_bacc = max(bacc_array)
+
+    if WITH_MLFLOW:
+        mlflow.log_metric("final_bacc", max_bacc)
+        mlflow.log_metric("final_precision", precision)
+        mlflow.log_metric("final_recall", recall)
+        mlflow.log_metric("final_auc", auc)
+        mlflow.log_metric("final_accuracy", acc)
+        mlflow.end_run()
+
     return max_bacc
 
 if __name__ == "__main__":
