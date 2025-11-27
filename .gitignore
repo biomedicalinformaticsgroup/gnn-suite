@@ -8,3 +8,5 @@ logs/
 __pycache__
 staging/
 .DS_Store
+mlflow.db
+mlruns/
