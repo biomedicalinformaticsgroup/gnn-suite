@@ -20,6 +20,7 @@ println "Metrics:  ${params.metrics}"
 println "Eval-q: ${params.eval_threshold}"
 println "Verbose interval: ${params.verbose_interval}"
 println "Data set: ${params.dataSet}"
+println "Task type: ${params.task_type}"
 
 println ""
 
@@ -27,19 +28,19 @@ println ""
 dataSet = params.dataSet
 
 process TrainGNN {
-    tag "${model}-${epoch}"
-    
-    publishDir "${resultsDir}/data/${dataSet}", pattern: "full-${model}-${epoch}-run-${run}*.txt", mode: 'copy'
+    tag "${model}-${epoch}-${params.task_type}"
+
+    publishDir "${resultsDir}/data/${dataSet}", pattern: "full-${model}-${epoch}-run-${run}-${params.task_type}*.txt", mode: 'copy'
 
     input:
         tuple path(geneFile), path(networkFile), val(model), val(epoch)
-        each run 
+        each run
 
     output:
-        tuple val(model), val(epoch), path("full-${model}-${epoch}-run-${run}.txt"), emit: full_output
-        tuple val(model), val(epoch), val("train"), path("full-${model}-${epoch}-run-${run}-train.txt"), emit: train_output
-        tuple val(model), val(epoch), val("test"), path("full-${model}-${epoch}-run-${run}-test.txt"), emit: test_output
-        tuple val(model), val(epoch), val("all"), path("full-${model}-${epoch}-run-${run}-all.txt"), emit: all_output
+        tuple val(model), val(epoch), path("full-${model}-${epoch}-run-${run}-${params.task_type}.txt"), emit: full_output
+        tuple val(model), val(epoch), val("train"), path("full-${model}-${epoch}-run-${run}-${params.task_type}-train.txt"), emit: train_output
+        tuple val(model), val(epoch), val("test"), path("full-${model}-${epoch}-run-${run}-${params.task_type}-test.txt"), emit: test_output
+        tuple val(model), val(epoch), val("all"), path("full-${model}-${epoch}-run-${run}-${params.task_type}-all.txt"), emit: all_output
 
     """
         gnn.py ${geneFile} ${networkFile} \
@@ -53,69 +54,70 @@ process TrainGNN {
                 --dropout ${params.dropout} \
                 --alpha ${params.alpha} \
                 --theta ${params.theta} \
-                 > full-${model}-${epoch}-run-${run}.txt
+                --task-type ${params.task_type} \
+                 > full-${model}-${epoch}-run-${run}-${params.task_type}.txt
 
-        split_data.py full-${model}-${epoch}-run-${run}.txt
+        split_data.py full-${model}-${epoch}-run-${run}-${params.task_type}.txt
     """
 }
 
 
 
 process PlotEpochMetrics {
-    tag "${model}-${epoch}-${split}"
+    tag "${model}-${epoch}-${split}-${params.task_type}"
 
-    publishDir "${resultsDir}/figures/${dataSet}", pattern: "${model}-${epoch}-split-${split}*.pdf", mode: 'copy'
+    publishDir "${resultsDir}/figures/${dataSet}", pattern: "${model}-${epoch}-split-${split}-${params.task_type}*.pdf", mode: 'copy'
 
     input:
         tuple val(model), val(epoch), val(split), path(files)
-       
+
 
     output:
-        path "${model}-${epoch}-split-${split}.pdf"
+        path "${model}-${epoch}-split-${split}-${params.task_type}.pdf"
 
     script:
     """
-        plot.py --model ${model} ${model}-${epoch}-split-${split}.pdf ${files}
+        plot.py --model ${model} ${model}-${epoch}-split-${split}-${params.task_type}.pdf ${files}
     """
 }
 
 
 process ComputeStats {
-    tag "${model}"
+    tag "${model}-${params.task_type}"
 
     input:
         tuple val(model), path(results,stageAs: "?/*")
 
     output:
-        path "stats-${model}.txt"
+        path "stats-${model}-${params.task_type}.txt"
 
     """
-        stats.py compute stats-${model}.txt ${results} ${model}
+        stats.py compute stats-${model}-${params.task_type}.txt ${results} ${model}
     """
 }
 
 process CollectStats {
-    tag "Final stats"
+    tag "Final stats-${params.task_type}"
 
-    publishDir "${resultsDir}", pattern: "stats.tex", mode: 'copy'
+    publishDir "${resultsDir}", pattern: "stats-${params.task_type}.tex", mode: 'copy'
 
     input:
         path results
 
     output:
-        path "stats.tex"
+        path "stats-${params.task_type}.tex"
 
     """
         # collect stats
-        stats.py collect stats.tex ${results}
+        stats.py collect stats-${params.task_type}.tex ${results}
     """
 }
 
 process HyperparameterOptimization {
 
-    tag "${dataSet}-${model}"  
-    
-    publishDir "${resultsDir}/hyperparameters/${dataSet}", pattern: "best_trial_${model}_${dataSet}.txt", mode: 'copy'
+    tag "${dataSet}-${model}-${params.task_type}"
+
+    publishDir "${resultsDir}/hyperparameters/${dataSet}", pattern: "best_trial_${model}_${dataSet}_${params.task_type}.txt", mode: 'copy'
 
     input:
         tuple path(geneFile),
@@ -124,13 +126,13 @@ process HyperparameterOptimization {
         val(dataSet)
 
     output:
-        path "best_trial_${model}_${dataSet}.txt", emit: best_trial_output
+        path "best_trial_${model}_${dataSet}_${params.task_type}.txt", emit: best_trial_output
 
     """
         hyperopt.py ${geneFile} ${networkFile}\
             ${model} \
-            ${dataSet} > best_trial_${model}_${dataSet}.txt
-        clean_hparams.py best_trial_${model}_${dataSet}.txt
+            ${dataSet} > best_trial_${model}_${dataSet}_${params.task_type}.txt
+        clean_hparams.py best_trial_${model}_${dataSet}_${params.task_type}.txt
     """
 }
 
