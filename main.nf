@@ -43,6 +43,12 @@ process TrainGNN {
         tuple val(model), val(epoch), val("all"), path("full-${model}-${epoch}-run-${run}-${params.task_type}-all.txt"), emit: all_output
 
     """
+        export WITH_MLFLOW="${params.with_mlflow ? '1' : '0'}"
+        export MLFLOW_TRACKING_URI="${params.mlflow_tracking_uri}"
+        export MLFLOW_EXPERIMENT_NAME="${params.mlflow_experiment_name}"
+        export DATASET="${dataSet}"
+        export REPLICATE="${run}"
+
         gnn.py ${geneFile} ${networkFile} \
                 --train-size ${params.train_size} \
                 --model-name ${model} \

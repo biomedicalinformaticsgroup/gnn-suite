@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import os
 import typer
 import csv
 
@@ -11,6 +12,14 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 
 from models import GCN, GAT, HGCN, PHGCN, GraphSAGE, GraphIsomorphismNetwork, GCNII, GraphTransformer
+
+WITH_MLFLOW = os.environ.get("WITH_MLFLOW", "0") == "1"
+if WITH_MLFLOW:
+    try:
+        import mlflow
+    except ImportError:
+        print("Warning: Mlflow is enabled but mlflow not installed. Disabling MLflow.")
+        WITH_MLFLOW = False
 
 
 def read_gene_file(gene_filename, task_type='binary'):
@@ -552,7 +561,8 @@ def run(
     dropout: float = 0.5,
     alpha: float = 0.1,
     theta: float = 0.5,
-    task_type: str = 'binary'
+    task_type: str = 'binary',
+    manage_mlflow_run: bool = True
 ):
     """
     Train a graph neural network.
@@ -562,184 +572,277 @@ def run(
     - network_filename: Path to the network file.
     - train_size: Proportion of the dataset to include in the train split.
     - model_name: Name of the model to train.
-    - num_epochs: Number of training epochs.
+    - epochs: Number of training epochs.
     - learning_rate: Learning rate for the optimizer.
     - weight_decay: Weight decay for the optimizer.
     - eval_threshold: Threshold for quantile function in evaluation.
     - verbose_interval: Interval for printing training progress.
     - task_type: Type of task ('binary', 'multiclass', 'regression').
+    - manage_mlflow_run: Whether to start/end MLflow run.
     """
-    # Load the data
-    data = load_data(gene_filename, network_filename, train_size, task_type=task_type)
+    start_run = False
+    if WITH_MLFLOW and manage_mlflow_run:
+        tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "file:./mlruns")
+        experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "gnn-suite")
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_experiment(experiment_name)
 
-    # Print basic information about the data and model
-    print(
-        f"# Number of nodes={data.num_nodes}; Number of edges={data.num_edges}; "
-        f"Number of node features={data.num_features}; Model: {model_name}."
-    )
+        if mlflow.active_run() is None:
+            dataset = os.environ.get("DATASET", os.path.basename(gene_filename).split('.')[0])
+            replicate = os.environ.get("REPLICATE", "1")
+            run_name = f"{model_name}_{dataset}_rep{replicate}_{task_type}"
+            mlflow.start_run(run_name=run_name)
+            start_run = True
+        else:
+            print(f"# Using existing MLflow run: {mlflow.active_run().info.run_id}")
+            start_run = False
 
-    # Print network statistics
-    # print_network_statistics(data, task_type=task_type)
+    try:
+        # Load the data
+        data = load_data(gene_filename, network_filename, train_size, task_type=task_type)
 
-    # Determine the device to use for computation
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Move data to device first
-    data = data.to(device)
-
-    # Build the model and move it to the appropriate device
-    model = build_model(model_name, data, dropout, alpha, theta, task_type=task_type).to(device)
-
-    # Initialize the optimizer
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=learning_rate, weight_decay=weight_decay
-    )
-
-    # Compute the weight for positive samples (binary only)
-    # Note: data is already on device, so pos_weight will be created on the same device
-    pos_weight = compute_positive_sample_weight(data, task_type=task_type)
-    if pos_weight is not None:
-        pos_weight = pos_weight.to(device)
-
-    # Print the header for the training progress output
-    if task_type == 'regression':
+        # Print basic information about the data and model
         print(
-            "{:>10} {:>10} {:>10} {:>10} {:>10} {:>10} ".format(
-                "epoch",
-                "loss",
-                "mse",
-                "rmse",
-                "mae",
-                "r2",
-            )
-        )
-    elif task_type == 'multiclass':
-        print(
-            "{:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} ".format(
-                "epoch",
-                "loss",
-                "prec",
-                "rec",
-                "acc",
-                "bacc",
-                "f1",
-                "auc",
-            )
-        )
-    else:
-        print(
-            "{:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} ".format(
-                "epoch",
-                "loss",
-                "tn",
-                "fp",
-                "fn",
-                "tp",
-                "prec",
-                "rec",
-                "acc",
-                "bacc",
-                "auc",
-            )
+            f"# Number of nodes={data.num_nodes}; Number of edges={data.num_edges}; "
+            f"Number of node features={data.num_features}; Model: {model_name}."
         )
 
-    # instantiate metric array for hyperparameter search
-    metric_array = []
+        # Print network statistics
+        # print_network_statistics(data, task_type=task_type)
 
-    for epoch in range(1, epochs + 1):
-        loss = train(model, data, optimizer, pos_weight=pos_weight, task_type=task_type)
+        # Determine the device to use for computation
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Evaluate the model and print the results at the specified interval
-        if (epoch % verbose_interval == 0) or (epoch == 1):
+        # Move data to device first
+        data = data.to(device)
+
+        # Build the model and move it to the appropriate device
+        model = build_model(model_name, data, dropout, alpha, theta, task_type=task_type).to(device)
+
+        # Initialize the optimizer
+        optimizer = torch.optim.Adam(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
+
+        if WITH_MLFLOW and manage_mlflow_run:
+            config = {
+                "model": model_name,
+                "task_type": task_type,
+                "learning_rate": learning_rate,
+                "weight_decay": weight_decay,
+                "dropout": dropout,
+                "alpha": alpha,
+                "theta": theta,
+                "epochs": epochs,
+                "train_size": train_size,
+                "eval_threshold": eval_threshold,
+                "num_nodes": data.num_nodes,
+                "num_edges": data.num_edges,
+                "num_features": data.num_features
+            }
+            mlflow.log_params(config)
+            mlflow.set_tag("task_type", task_type)
+            mlflow.set_tag("model_name", model_name)
+            mlflow.set_tag("dataset", os.path.basename(gene_filename).split('.')[0])
+
+        # Compute the weight for positive samples (binary only)
+        # Note: data is already on device, so pos_weight will be created on the same device
+        pos_weight = compute_positive_sample_weight(data, task_type=task_type)
+        if pos_weight is not None:
+            pos_weight = pos_weight.to(device)
+
+        # Print the header for the training progress output
+        if task_type == 'regression':
+            print(
+                "{:>10} {:>10} {:>10} {:>10} {:>10} {:>10} ".format(
+                    "epoch",
+                    "loss",
+                    "mse",
+                    "rmse",
+                    "mae",
+                    "r2",
+                )
+            )
+        elif task_type == 'multiclass':
+            print(
+                "{:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} ".format(
+                    "epoch",
+                    "loss",
+                    "prec",
+                    "rec",
+                    "acc",
+                    "bacc",
+                    "f1",
+                    "auc",
+                )
+            )
+        else:
+            print(
+                "{:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} ".format(
+                    "epoch",
+                    "loss",
+                    "tn",
+                    "fp",
+                    "fn",
+                    "tp",
+                    "prec",
+                    "rec",
+                    "acc",
+                    "bacc",
+                    "auc",
+                )
+            )
+
+        # instantiate metric array for hyperparameter search
+        metric_array = []
+
+        for epoch in range(1, epochs + 1):
+            loss = train(model, data, optimizer, pos_weight=pos_weight, task_type=task_type)
+
+            if WITH_MLFLOW and manage_mlflow_run:
+                mlflow.log_metric("train_loss", float(loss), step=epoch)
+
+            # Evaluate the model and print the results at the specified interval
+            if (epoch % verbose_interval == 0) or (epoch == 1):
+                if task_type == 'multiclass':
+                    precision, recall, acc, bacc, f1, auc = evaluate(
+                        model, data, eval_threshold, task_type=task_type
+                    )
+                    precision_train, recall_train, acc_train, bacc_train, f1_train, auc_train = evaluate_train(
+                        model, data, eval_threshold, task_type=task_type
+                    )
+                    precision_all, recall_all, acc_all, bacc_all, f1_all, auc_all = evaluate_all(
+                        model, data, eval_threshold, task_type=task_type
+                    )
+
+                    print(
+                        "Test: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
+                            epoch, loss, precision, recall, acc, bacc, f1, auc
+                        )
+                    )
+                    print(
+                        "Train: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
+                            epoch, loss, precision_train, recall_train, acc_train, bacc_train, f1_train, auc_train
+                        )
+                    )
+                    print(
+                        "All: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
+                            epoch, loss, precision_all, recall_all, acc_all, bacc_all, f1_all, auc_all
+                        )
+                    )
+
+                    metric_array.append(bacc)
+
+                    if WITH_MLFLOW and manage_mlflow_run:
+                        mlflow.log_metric("val_precision", precision, step=epoch)
+                        mlflow.log_metric("val_recall", recall, step=epoch)
+                        mlflow.log_metric("val_accuracy", acc, step=epoch)
+                        mlflow.log_metric("val_bacc", bacc, step=epoch)
+                        mlflow.log_metric("val_f1", f1, step=epoch)
+                        mlflow.log_metric("val_auc", auc, step=epoch)
+
+                elif task_type == 'regression':
+                    mse, rmse, mae, r2 = evaluate(
+                        model, data, eval_threshold, task_type=task_type
+                    )
+                    mse_train, rmse_train, mae_train, r2_train = evaluate_train(
+                        model, data, eval_threshold, task_type=task_type
+                    )
+                    mse_all, rmse_all, mae_all, r2_all = evaluate_all(
+                        model, data, eval_threshold, task_type=task_type
+                    )
+
+                    print(
+                        "Test: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
+                            epoch, loss, mse, rmse, mae, r2
+                        )
+                    )
+                    print(
+                        "Train: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
+                            epoch, loss, mse_train, rmse_train, mae_train, r2_train
+                        )
+                    )
+                    print(
+                        "All: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
+                            epoch, loss, mse_all, rmse_all, mae_all, r2_all
+                        )
+                    )
+
+                    metric_array.append(r2)
+
+                    if WITH_MLFLOW and manage_mlflow_run:
+                        mlflow.log_metric("val_mse", mse, step=epoch)
+                        mlflow.log_metric("val_rmse", rmse, step=epoch)
+                        mlflow.log_metric("val_mae", mae, step=epoch)
+                        mlflow.log_metric("val_r2", r2, step=epoch)
+
+                else:  # binary
+                    tn, fp, fn, tp, precision, recall, acc, bacc, auc = evaluate(
+                        model, data, eval_threshold, task_type=task_type
+                    )
+                    tn_train, fp_train, fn_train, tp_train, precision_train, recall_train, acc_train, bacc_train, auc_train = evaluate_train(
+                        model, data, eval_threshold, task_type=task_type
+                    )
+                    tn_all, fp_all, fn_all, tp_all, precision_all, recall_all, acc_all, bacc_all, auc_all = evaluate_all(
+                        model, data, eval_threshold, task_type=task_type
+                    )
+
+                    print(
+                        "Test: {:>10} {:>10.5g} {:>10} {:>10} {:>10} {:>10} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
+                            epoch, loss, tn, fp, fn, tp, precision, recall, acc, bacc, auc
+                        )
+                    )
+                    print(
+                        "Train: {:>10} {:>10.5g} {:>10} {:>10} {:>10} {:>10} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
+                            epoch, loss, tn_train, fp_train, fn_train, tp_train, precision_train, recall_train, acc_train, bacc_train, auc_train
+                        )
+                    )
+                    print(
+                        "All: {:>10} {:>10.5g} {:>10} {:>10} {:>10} {:>10} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
+                            epoch, loss, tn_all, fp_all, fn_all, tp_all, precision_all, recall_all, acc_all, bacc_all, auc_all
+                        )
+                    )
+
+                    metric_array.append(bacc)
+
+                    if WITH_MLFLOW and manage_mlflow_run:
+                        mlflow.log_metric("val_tn", tn, step=epoch)
+                        mlflow.log_metric("val_fp", fp, step=epoch)
+                        mlflow.log_metric("val_fn", fn, step=epoch)
+                        mlflow.log_metric("val_tp", tp, step=epoch)
+                        mlflow.log_metric("val_precision", precision, step=epoch)
+                        mlflow.log_metric("val_recall", recall, step=epoch)
+                        mlflow.log_metric("val_accuracy", acc, step=epoch)
+                        mlflow.log_metric("val_bacc", bacc, step=epoch)
+                        mlflow.log_metric("val_auc", auc, step=epoch)
+
+        max_metric = max(metric_array)
+
+        if WITH_MLFLOW and manage_mlflow_run:
             if task_type == 'multiclass':
-                precision, recall, acc, bacc, f1, auc = evaluate(
-                    model, data, eval_threshold, task_type=task_type
-                )
-                precision_train, recall_train, acc_train, bacc_train, f1_train, auc_train = evaluate_train(
-                    model, data, eval_threshold, task_type=task_type
-                )
-                precision_all, recall_all, acc_all, bacc_all, f1_all, auc_all = evaluate_all(
-                    model, data, eval_threshold, task_type=task_type
-                )
-
-                print(
-                    "Test: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
-                        epoch, loss, precision, recall, acc, bacc, f1, auc
-                    )
-                )
-                print(
-                    "Train: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
-                        epoch, loss, precision_train, recall_train, acc_train, bacc_train, f1_train, auc_train
-                    )
-                )
-                print(
-                    "All: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
-                        epoch, loss, precision_all, recall_all, acc_all, bacc_all, f1_all, auc_all
-                    )
-                )
-
-                metric_array.append(bacc)
-
+                mlflow.log_metric("final_bacc", max_metric)
+                mlflow.log_metric("final_precision", precision)
+                mlflow.log_metric("final_recall", recall)
+                mlflow.log_metric("final_accuracy", acc)
+                mlflow.log_metric("final_f1", f1)
+                mlflow.log_metric("final_auc", auc)
             elif task_type == 'regression':
-                mse, rmse, mae, r2 = evaluate(
-                    model, data, eval_threshold, task_type=task_type
-                )
-                mse_train, rmse_train, mae_train, r2_train = evaluate_train(
-                    model, data, eval_threshold, task_type=task_type
-                )
-                mse_all, rmse_all, mae_all, r2_all = evaluate_all(
-                    model, data, eval_threshold, task_type=task_type
-                )
-
-                print(
-                    "Test: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
-                        epoch, loss, mse, rmse, mae, r2
-                    )
-                )
-                print(
-                    "Train: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
-                        epoch, loss, mse_train, rmse_train, mae_train, r2_train
-                    )
-                )
-                print(
-                    "All: {:>10} {:>10.5g} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
-                        epoch, loss, mse_all, rmse_all, mae_all, r2_all
-                    )
-                )
-
-                metric_array.append(r2)
-
+                mlflow.log_metric("final_r2", max_metric)
+                mlflow.log_metric("final_mse", mse)
+                mlflow.log_metric("final_rmse", rmse)
+                mlflow.log_metric("final_mae", mae)
             else:  # binary
-                tn, fp, fn, tp, precision, recall, acc, bacc, auc = evaluate(
-                    model, data, eval_threshold, task_type=task_type
-                )
-                tn_train, fp_train, fn_train, tp_train, precision_train, recall_train, acc_train, bacc_train, auc_train = evaluate_train(
-                    model, data, eval_threshold, task_type=task_type
-                )
-                tn_all, fp_all, fn_all, tp_all, precision_all, recall_all, acc_all, bacc_all, auc_all = evaluate_all(
-                    model, data, eval_threshold, task_type=task_type
-                )
+                mlflow.log_metric("final_bacc", max_metric)
+                mlflow.log_metric("final_precision", precision)
+                mlflow.log_metric("final_recall", recall)
+                mlflow.log_metric("final_accuracy", acc)
+                mlflow.log_metric("final_auc", auc)
 
-                print(
-                    "Test: {:>10} {:>10.5g} {:>10} {:>10} {:>10} {:>10} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
-                        epoch, loss, tn, fp, fn, tp, precision, recall, acc, bacc, auc
-                    )
-                )
-                print(
-                    "Train: {:>10} {:>10.5g} {:>10} {:>10} {:>10} {:>10} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
-                        epoch, loss, tn_train, fp_train, fn_train, tp_train, precision_train, recall_train, acc_train, bacc_train, auc_train
-                    )
-                )
-                print(
-                    "All: {:>10} {:>10.5g} {:>10} {:>10} {:>10} {:>10} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} {:>10.3f} ".format(
-                        epoch, loss, tn_all, fp_all, fn_all, tp_all, precision_all, recall_all, acc_all, bacc_all, auc_all
-                    )
-                )
+        return max_metric
 
-                metric_array.append(bacc)
-
-    max_metric = max(metric_array)
-    return max_metric
+    finally:
+        if WITH_MLFLOW and start_run:
+            mlflow.end_run()
 
 if __name__ == "__main__":
     typer.run(run)
