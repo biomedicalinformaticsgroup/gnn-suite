@@ -838,6 +838,16 @@ def run(
                 mlflow.log_metric("final_accuracy", acc)
                 mlflow.log_metric("final_auc", auc)
 
+            register_model = os.environ.get("MLFLOW_REGISTER_MODEL", "0") == "1"
+            if register_model:
+                mlflow.pytorch.log_model(model, "model")
+                dataset = os.environ.get("DATASET", os.path.basename(gene_filename).split('.')[0])
+                model_name_registry = f"{model_name}_{dataset}_{task_type}"
+                mlflow.register_model(
+                    "runs:/{}/model".format(mlflow.active_run().info.run_id),
+                    model_name_registry
+                )
+
         return max_metric
 
     finally:

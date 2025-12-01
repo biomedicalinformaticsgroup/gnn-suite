@@ -46,6 +46,7 @@ process TrainGNN {
         export WITH_MLFLOW="${params.with_mlflow ? '1' : '0'}"
         export MLFLOW_TRACKING_URI="${params.mlflow_tracking_uri}"
         export MLFLOW_EXPERIMENT_NAME="${params.mlflow_experiment_name}"
+        export MLFLOW_REGISTER_MODEL="${params.mlflow_register_model ? '1' : '0'}"
         export DATASET="${dataSet}"
         export REPLICATE="${run}"
 
