@@ -9,4 +9,5 @@ __pycache__
 staging/
 .DS_Store
 mlflow.db
+mlflow-artifacts/
 mlruns/
