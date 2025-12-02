@@ -84,7 +84,7 @@ process PlotEpochMetrics {
 
     script:
     """
-        plot.py --model ${model} ${model}-${epoch}-split-${split}-${params.task_type}.pdf ${files}
+        plot.py --model ${model} --task-type ${params.task_type} ${model}-${epoch}-split-${split}-${params.task_type}.pdf ${files}
     """
 }
 
@@ -186,6 +186,8 @@ workflow {
     groupedResult.view()
 
     // plot the results
-    PlotEpochMetrics(groupedResult).view()
+    if (params.enable_plots) {
+        PlotEpochMetrics(groupedResult).view()
+    }
 }
 
