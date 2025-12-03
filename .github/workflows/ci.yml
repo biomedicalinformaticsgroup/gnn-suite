@@ -1,6 +1,7 @@
 name: "build"
 on:
   push:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -39,6 +40,26 @@ jobs:
           wget -qO- https://github.com/nextflow-io/nextflow/releases/download/v${NEXTFLOW_VERSION}/nextflow | bash
           sudo mv nextflow /usr/local/bin/
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Flake8 Lint (Critical Errors)
+        uses: py-actions/flake8@v2
+        with:
+          path: "bin"
+          max-line-length: "127"
+          select: "E9,F63,F7,F82"
+
       - name: List files in the working directory
         run: ls -alh "${{ github.workspace }}"
 
@@ -49,6 +70,73 @@ jobs:
         run: |
           chmod +x bin/*
           nextflow run . -profile test,ci,docker
+
+      - name: Integration Test - Binary Classification
+        run: |
+          nextflow run . -profile test,ci,docker \
+            --task-type binary \
+            --geneFile testdata/genes.csv \
+            --networkFile testdata/network.tsv \
+            --dataSet testdata-binary \
+            --epochs 10 \
+            --replicates 1 \
+            --enable_plots true
+
+      - name: Integration Test - Multiclass Classification
+        run: |
+          nextflow run . -profile test,ci,docker \
+            --task-type multiclass \
+            --geneFile testdata/sfari_multiclass_genes.csv \
+            --networkFile testdata/sfari_multiclass_network.tsv \
+            --dataSet testdata-multiclass \
+            --epochs 10 \
+            --replicates 1 \
+            --enable_plots true
+
+      - name: Integration Test - Regression
+        run: |
+          nextflow run . -profile test,ci,docker \
+            --task-type regression \
+            --geneFile testdata/sfari_regression_genes.csv \
+            --networkFile testdata/sfari_regression_network.tsv \
+            --dataSet testdata-regression \
+            --epochs 10 \
+            --replicates 1 \
+            --enable_plots true
+
+      - name: Integration Test - MLflow Enabled
+        run: |
+          nextflow run . -profile test,ci,docker \
+            --task-type binary \
+            --geneFile testdata/genes.csv \
+            --networkFile testdata/network.tsv \
+            --dataSet testdata-mlflow \
+            --epochs 10 \
+            --replicates 1 \
+            --with_mlflow true \
+            --mlflow_tracking_uri "file:./mlruns" \
+            --enable_plots true
+
+      - name: Verify MLflow outputs
+        run: |
+          echo "Checking MLflow outputs..."
+          ls -lh mlruns/ || echo "No mlruns directory"
+          if [ ! -d "mlruns" ]; then
+            echo "ERROR: MLflow tracking directory not created"
+            exit 1
+          fi
+
+      - name: Upload Test Artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            results/
+            mlruns/
+            mlflow.db
+            .nextflow.log
+          retention-days: 30
 
       # Uncomment this section only if you need to push a new image
       # - name: Push image to GitHub Container Registry
