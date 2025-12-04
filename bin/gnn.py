@@ -172,7 +172,7 @@ def load_data(gene_filename, network_filename, train_size=0.7, task_type='binary
     return data
 
 
-def build_model(name, data, dropout=0.5, alpha=0.1, theta=0.5, task_type='binary'):
+def build_model(name, data, dropout=0.5, alpha=0.1, theta=0.5, num_heads=1, task_type='binary'):
     """
     Instantiate a model based on the name.
 
@@ -201,7 +201,7 @@ def build_model(name, data, dropout=0.5, alpha=0.1, theta=0.5, task_type='binary
         print("Unknown model: {}.".format(name))
         sys.exit(1)
     elif name == "gat":
-        return GAT(num_features, num_classes, dropout=dropout)
+        return GAT(num_features, num_classes, num_heads=num_heads, dropout=dropout)
     elif name == "gat3h":
         return GAT(num_features, num_classes, num_heads=3, dropout=dropout)
     elif name == "hgcn":
@@ -561,6 +561,7 @@ def run(
     dropout: float = 0.5,
     alpha: float = 0.1,
     theta: float = 0.5,
+    num_heads: int = 1,
     task_type: str = 'binary',
     manage_mlflow_run: bool = True
 ):
@@ -617,7 +618,7 @@ def run(
         data = data.to(device)
 
         # Build the model and move it to the appropriate device
-        model = build_model(model_name, data, dropout, alpha, theta, task_type=task_type).to(device)
+        model = build_model(model_name, data, dropout, alpha, theta, num_heads, task_type=task_type).to(device)
 
         # Initialize the optimizer
         optimizer = torch.optim.Adam(
@@ -817,7 +818,6 @@ def run(
                         mlflow.log_metric("val_auc", auc, step=epoch)
 
         max_metric = max(metric_array)
-
         if WITH_MLFLOW and manage_mlflow_run:
             if task_type == 'multiclass':
                 mlflow.log_metric("final_bacc", max_metric)

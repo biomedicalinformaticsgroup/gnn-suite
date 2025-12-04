@@ -1,0 +1,66 @@
+default:
+  learning_rate:
+    type: float
+    low: 0.001
+    high: 0.5
+    log: true
+    default: 0.01
+
+  weight_decay:
+    type: float
+    low: 0.00001
+    high: 0.5
+    log: true
+    default: 0.0001
+
+  dropout:
+    type: float
+    low: 0.0
+    high: 0.8
+    default: 0.5
+
+  epochs:
+    type: int
+    low: 100
+    high: 300
+    default: 250
+
+gcn: pass
+
+gcn2:
+  alpha:
+    type: float
+    low: 0.001
+    high: 10.0
+    log: true
+    default: 0.1
+
+  theta:
+    type: float
+    low: 0.001
+    high: 10.0
+    log: true
+    default: 0.5
+
+gat:
+  num_heads:
+    type: categorical
+    choices: [1, 2, 4, 8]
+    default: 1
+
+hgcn: pass
+
+phgcn: pass
+
+sage: pass
+
+gin: pass
+
+gtn: pass
+
+optimization:
+  n_trials: 5
+  n_jobs: -1
+  timeout: null
+  sampler: TPE
+  pruner: MedianPruner

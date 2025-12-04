@@ -50,17 +50,29 @@ process TrainGNN {
         export DATASET="${dataSet}"
         export REPLICATE="${run}"
 
+        # Load model-specific hyperparameters (or use defaults)
+        eval \$(load_hyperparams.py ${model} ${dataSet} ${resultsDir} \
+            ${params.learning_rate} \
+            ${params.weight_decay} \
+            ${params.dropout} \
+            ${params.alpha} \
+            ${params.theta} \
+            ${params.num_heads})
+
+        echo "# Using hyperparameters for ${model}: LR=\${LEARNING_RATE}, WD=\${WEIGHT_DECAY}, DROPOUT=\${DROPOUT}, ALPHA=\${ALPHA}, THETA=\${THETA}, NUM_HEADS=\${NUM_HEADS}" >&2
+
         gnn.py ${geneFile} ${networkFile} \
                 --train-size ${params.train_size} \
                 --model-name ${model} \
-                --learning-rate ${params.learning_rate} \
-                --weight-decay ${params.weight_decay} \
+                --learning-rate \${LEARNING_RATE} \
+                --weight-decay \${WEIGHT_DECAY} \
                 --epochs ${epoch} \
                 --eval-threshold ${params.eval_threshold} \
                 --verbose-interval ${params.verbose_interval} \
-                --dropout ${params.dropout} \
-                --alpha ${params.alpha} \
-                --theta ${params.theta} \
+                --dropout \${DROPOUT} \
+                --alpha \${ALPHA} \
+                --theta \${THETA} \
+                --num-heads \${NUM_HEADS} \
                 --task-type ${params.task_type} \
                  > full-${model}-${epoch}-run-${run}-${params.task_type}.txt
 
@@ -124,7 +136,7 @@ process HyperparameterOptimization {
 
     tag "${dataSet}-${model}-${params.task_type}"
 
-    publishDir "${resultsDir}/hyperparameters/${dataSet}", pattern: "best_trial_${model}_${dataSet}_${params.task_type}.txt", mode: 'copy'
+    publishDir "${resultsDir}/hyperparameters/${dataSet}", pattern: "best_trial_${model}_${dataSet}.*", mode: 'copy'
 
     input:
         tuple path(geneFile),
@@ -134,11 +146,18 @@ process HyperparameterOptimization {
 
     output:
         path "best_trial_${model}_${dataSet}_${params.task_type}.txt", emit: best_trial_output
+        path "best_trial_${model}_${dataSet}.json", emit: best_trial_json
 
     """
-        hyperopt.py ${geneFile} ${networkFile}\
+        echo "Starting hyperparameter optimization for ${model} on ${dataSet}..."
+
+        hyperopt.py ${geneFile} ${networkFile} \
             ${model} \
-            ${dataSet} > best_trial_${model}_${dataSet}_${params.task_type}.txt
+            ${dataSet} \
+            --task-type ${params.task_type} \
+            2>&1 | tee best_trial_${model}_${dataSet}_${params.task_type}.txt
+
+        echo "Completed hyperparameter optimization for ${model}"
         clean_hparams.py best_trial_${model}_${dataSet}_${params.task_type}.txt
     """
 }
@@ -153,7 +172,7 @@ workflow hyperopt {
     hparams = HyperparameterOptimization(
         hparamChan
     )
-    hparams.view()
+    hparams.best_trial_output.view()
 }
 
 
