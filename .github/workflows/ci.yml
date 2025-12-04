@@ -126,6 +126,58 @@ jobs:
             exit 1
           fi
 
+      - name: Hyperopt Test - Binary Classification
+        run: |
+          nextflow run . -entry hyperopt -profile test,ci,docker \
+            --task_type binary \
+            --geneFile testdata/genes.csv \
+            --networkFile testdata/network.tsv \
+            --dataSet testdata-binary-hyperopt \
+            --models '["gcn"]'
+
+      - name: Hyperopt Test - Multiclass Classification
+        run: |
+          nextflow run . -entry hyperopt -profile test,ci,docker \
+            --task_type multiclass \
+            --geneFile testdata/sfari_multiclass_genes.csv \
+            --networkFile testdata/sfari_multiclass_network.tsv \
+            --dataSet sfari-multiclass-hyperopt \
+            --models '["gcn"]'
+
+      - name: Hyperopt Test - Regression
+        run: |
+          nextflow run . -entry hyperopt -profile test,ci,docker \
+            --task_type regression \
+            --geneFile testdata/sfari_regression_genes.csv \
+            --networkFile testdata/sfari_regression_network.tsv \
+            --dataSet sfari-regression-hyperopt \
+            --models '["gcn"]'
+
+      - name: Verify Hyperopt outputs
+        run: |
+          echo "Checking hyperopt JSON outputs..."
+          ls -lh results/hyperparameters/ || echo "No hyperparameters directory"
+
+          # Check for binary hyperopt results
+          if [ ! -f "results/hyperparameters/testdata-binary-hyperopt/best_trial_gcn_testdata-binary-hyperopt.json" ]; then
+            echo "ERROR: Binary hyperopt results not found"
+            exit 1
+          fi
+
+          # Check for multiclass hyperopt results
+          if [ ! -f "results/hyperparameters/sfari-multiclass-hyperopt/best_trial_gcn_sfari-multiclass-hyperopt.json" ]; then
+            echo "ERROR: Multiclass hyperopt results not found"
+            exit 1
+          fi
+
+          # Check for regression hyperopt results
+          if [ ! -f "results/hyperparameters/sfari-regression-hyperopt/best_trial_gcn_sfari-regression-hyperopt.json" ]; then
+            echo "ERROR: Regression hyperopt results not found"
+            exit 1
+          fi
+
+          echo "All hyperopt outputs verified successfully!"
+
       - name: Upload Test Artifacts
         if: always()
         uses: actions/upload-artifact@v3
