@@ -300,15 +300,10 @@ The pipeline supports [MLflow](https://mlflow.org/) for experiment tracking, met
 ### Enabling MLflow
 
 ```bash
-# Using SQLite database (recommended)
+# Using SQLite database
 nextflow run main.nf -profile docker,test \
   --with_mlflow true \
   --mlflow_tracking_uri "sqlite:///mlflow.db"
-
-# Using file-based storage
-nextflow run main.nf -profile docker,test \
-  --with_mlflow true \
-  --mlflow_tracking_uri "file:./mlruns"
 ```
 
 ### MLflow Parameters
@@ -342,8 +337,6 @@ nextflow run main.nf -profile docker,test \
 MLflow logs the following metrics per epoch:
 - **Binary/Multiclass**: precision, recall, accuracy, balanced accuracy, F1, AUC
 - **Regression**: MSE, RMSE, MAE, R²
-
-For more information on MLflow, visit the official documentation at [https://mlflow.org/docs](https://mlflow.org/docs/latest/index.html).
 
 
 ## FAQ
