@@ -48,8 +48,8 @@ The following models are included:
 
 The pipeline supports three types of node classification/prediction tasks:
 
-- **Binary Classification** (`binary`): Two-class classification (e.g., cancer driver vs non-driver genes)
-- **Multiclass Classification** (`multiclass`): Multi-class classification with more than two classes
+- **Binary Classification** (`binary`): Two class classification
+- **Multiclass Classification** (`multiclass`): Multi class classification with more than two classes
 - **Regression** (`regression`): Continuous value prediction
 
 Specify the task type using the `--task_type` parameter:
@@ -60,14 +60,14 @@ nextflow run main.nf -profile docker,test --task_type binary
 
 # Multiclass classification
 nextflow run main.nf -profile docker \
-  --geneFile testdata/sfari_multiclass_genes.csv \
-  --networkFile testdata/sfari_multiclass_network.tsv \
+  --geneFile testdata/multiclass.csv \
+  --networkFile testdata/multiclass_network.tsv \
   --task_type multiclass
 
 # Regression
 nextflow run main.nf -profile docker \
-  --geneFile testdata/sfari_regression_genes.csv \
-  --networkFile testdata/sfari_regression_network.tsv \
+  --geneFile testdata/regression.csv \
+  --networkFile testdata/regression_network.tsv \
   --task_type regression
 ```
 
@@ -110,7 +110,7 @@ For more information on `Nextflow`, you can visit the official documentation at 
 | `--geneFile` | null | Path to gene features CSV file |
 | `--networkFile` | null | Path to network edges TSV file |
 | `--resultsDir` | null | Results directory (defaults to `./results`) |
-| `--dataSet` | null | Dataset name (auto-derived from geneFile if not provided) |
+| `--dataSet` | null | Dataset name (auto generated from geneFile if not provided genefile_tasktype) |
 
 ### Experimental Parameters
 
@@ -138,7 +138,7 @@ For more information on `Nextflow`, you can visit the official documentation at 
 
 ## Output Description
 
-The `--dataSet` parameter determines the output folder name. If not provided, it defaults to `<geneFile_basename>_<task_type>` (e.g., `genes_binary`, `sfari_multiclass_genes_multiclass`).
+The `--dataSet` parameter determines the output folder name. If not provided, it defaults to `<geneFile_basename>_<task_type>` (e.g., `genes_binary`, `genes_multiclass`).
 
 After running the pipeline, results are organized in the following structure:
 
@@ -155,15 +155,6 @@ results/
     └── <model>-<epochs>-split-<split>-<task_type>.pdf   # Training plots (if enabled)
 ```
 
-### Output Files
-
-| File | Description |
-|------|-------------|
-| `full-*-<task_type>.txt` | Epoch-by-epoch training metrics |
-| `full-*-train.txt` | Metrics evaluated on training set |
-| `full-*-test.txt` | Metrics evaluated on test set |
-| `full-*-all.txt` | Metrics evaluated on all nodes |
-| `best_trial_*.json` | Best hyperparameters from optimization |
 
 
 ## Docker Image
@@ -257,14 +248,14 @@ nextflow run main.nf -profile docker -entry hyperopt \
 
 # Multiclass classification
 nextflow run main.nf -profile docker -entry hyperopt \
-  --geneFile testdata/sfari_multiclass_genes.csv \
-  --networkFile testdata/sfari_multiclass_network.tsv \
+  --geneFile testdata/genes.csv \
+  --networkFile testdata/multiclass_network.tsv \
   --task_type multiclass
 
 # Regression
 nextflow run main.nf -profile docker -entry hyperopt \
-  --geneFile testdata/sfari_regression_genes.csv \
-  --networkFile testdata/sfari_regression_network.tsv \
+  --geneFile testdata/genes.csv \
+  --networkFile testdata/regression_network.tsv \
   --task_type regression
 ```
 
@@ -297,11 +288,9 @@ The hyperparameter search space is defined in `conf/hyperparams.yaml`:
 ### Output
 
 The results are stored in `results/hyperparameters/<dataSet>/`:
-- `best_trial_<model>_<dataSet>.json` - Best hyperparameters (auto-loaded during training)
+- `best_trial_<model>_<dataSet>.json` - Best hyperparameters (auto used during training)
 
-When running the main training workflow, optimized hyperparameters are automatically loaded if available. The pipeline prints `Hyperparameters: Using optimized` or `Hyperparameters: Using defaults` at startup.
-
-For more information on `optuna`, visit the official documentation at [https://optuna.readthedocs.io](https://optuna.readthedocs.io).
+When running the main training workflow, optimized hyperparameters are automatically used if available.
 
 
 ## MLflow Integration
