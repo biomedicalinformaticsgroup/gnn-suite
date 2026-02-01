@@ -1,31 +1,29 @@
 // enabling nextflow DSL v2
 nextflow.enable.dsl=2
 
-// defaults results directory
 resultsDir = params.resultsDir ? params.resultsDir : "${workflow.launchDir}/results"
+dataSet = params.dataSet ? params.dataSet : "${file(params.geneFile).baseName}_${params.task_type}"
 
-// expDir = "${resultsDir}/${params.geneFile}/${params.networkFile}"
+hparamDir = file("${resultsDir}/hyperparameters/${dataSet}")
+hparamStatus = hparamDir.exists() ? "Using optimized (from ${hparamDir})" : "Using defaults"
 
 println ""
 println "Gene file: ${params.geneFile}"
 println "Network file: ${params.networkFile}"
+println "Hyperparameters: ${hparamStatus}"
 println "Results dir: ${resultsDir}"
+println "Data set: ${dataSet}"
+println "Task type: ${params.task_type}"
 println "Training set size: ${params.train_size}"
 println "Models: ${params.models}"
 println "Learning rate: ${params.learning_rate}"
 println "Weight decay: ${params.weight_decay}"
 println "Epochs: ${params.epochs}"
 println "Replicates: ${params.replicates}"
-println "Metrics:  ${params.metrics}"
-println "Eval-q: ${params.eval_threshold}"
+println "Metrics: ${params.metrics}"
+println "Eval threshold: ${params.eval_threshold}"
 println "Verbose interval: ${params.verbose_interval}"
-println "Data set: ${params.dataSet}"
-println "Task type: ${params.task_type}"
-
 println ""
-
-
-dataSet = params.dataSet
 
 process TrainGNN {
     tag "${model}-${epoch}-${params.task_type}"
@@ -166,7 +164,7 @@ workflow hyperopt {
     geneChan = channel.fromPath(params.geneFile)
     networkChan = channel.fromPath(params.networkFile)
     modelChan = channel.from(params.models)
-    dataSetChan = channel.value(params.dataSet)
+    dataSetChan = channel.value(dataSet)
     hparamChan = geneChan.combine(networkChan).combine(modelChan).combine(dataSetChan)
 
     hparams = HyperparameterOptimization(
