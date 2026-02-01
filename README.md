@@ -42,7 +42,34 @@ The following models are included:
 - Graph SAmpling and aggreGatE (GraphSAGE) 
 - Graph Transformer Networks (GTN) 
 - Graph Isomorphism Networks (GIN)
-- Graph Convolutional Networks II (GCNII) 
+- Graph Convolutional Networks II (GCNII)
+
+## Task Types
+
+The pipeline supports three types of node classification/prediction tasks:
+
+- **Binary Classification** (`binary`): Two-class classification (e.g., cancer driver vs non-driver genes)
+- **Multiclass Classification** (`multiclass`): Multi-class classification with more than two classes
+- **Regression** (`regression`): Continuous value prediction
+
+Specify the task type using the `--task_type` parameter:
+
+```bash
+# Binary classification
+nextflow run main.nf -profile docker,test --task_type binary
+
+# Multiclass classification
+nextflow run main.nf -profile docker \
+  --geneFile testdata/sfari_multiclass_genes.csv \
+  --networkFile testdata/sfari_multiclass_network.tsv \
+  --task_type multiclass
+
+# Regression
+nextflow run main.nf -profile docker \
+  --geneFile testdata/sfari_regression_genes.csv \
+  --networkFile testdata/sfari_regression_network.tsv \
+  --task_type regression
+```
 
 ## Architecture
 
@@ -72,6 +99,71 @@ nextflow run stracquadaniolab/gnn-suite -profile docker,<experiment_file>
 The results of the experimetn will be stored in the `results/data/<experiment_file>/` and `results/figures/<experiment_file>/` directory.
 
 For more information on `Nextflow`, you can visit the official documentation at [nextflow.io/docs](https://www.nextflow.io/docs/latest/index.html).
+
+
+## Parameters Reference
+
+### Data Parameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `--geneFile` | null | Path to gene features CSV file |
+| `--networkFile` | null | Path to network edges TSV file |
+| `--resultsDir` | null | Results directory (defaults to `./results`) |
+| `--dataSet` | null | Dataset name (auto-derived from geneFile if not provided) |
+
+### Experimental Parameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `--models` | `["gcn2", "gcn", "gat"]` | List of GNN models to train |
+| `--epochs` | `[100]` | Number of training epochs |
+| `--learning_rate` | `0.01` | Learning rate |
+| `--weight_decay` | `1e-4` | Weight decay for regularization |
+| `--train_size` | `0.8` | Train/test split ratio |
+| `--replicates` | `1` | Number of experiment replicates |
+| `--verbose_interval` | `10` | Logging interval (epochs) |
+| `--dropout` | `0.2` | Dropout rate |
+| `--alpha` | `0.1` | Alpha parameter (GCNII) |
+| `--theta` | `0` | Theta parameter (GCNII) |
+| `--num_heads` | `1` | Number of attention heads (GAT) |
+| `--task_type` | `binary` | Task type: `binary`, `multiclass`, `regression` |
+
+### Evaluation Parameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `--enable_plots` | `false` | Generate PDF plots |
+
+
+## Output Description
+
+The `--dataSet` parameter determines the output folder name. If not provided, it defaults to `<geneFile_basename>_<task_type>` (e.g., `genes_binary`, `sfari_multiclass_genes_multiclass`).
+
+After running the pipeline, results are organized in the following structure:
+
+```
+results/
+├── data/<dataSet>/
+│   ├── full-<model>-<epochs>-run-<replicate>-<task_type>.txt        # Full training output
+│   ├── full-<model>-<epochs>-run-<replicate>-<task_type>-train.txt  # Training set metrics
+│   ├── full-<model>-<epochs>-run-<replicate>-<task_type>-test.txt   # Test set metrics
+│   └── full-<model>-<epochs>-run-<replicate>-<task_type>-all.txt    # All nodes metrics
+├── hyperparameters/<dataSet>/
+│   └── best_trial_<model>_<dataSet>.json    # Optimized hyperparameters from hyperopt
+└── figures/<dataSet>/
+    └── <model>-<epochs>-split-<split>-<task_type>.pdf   # Training plots (if enabled)
+```
+
+### Output Files
+
+| File | Description |
+|------|-------------|
+| `full-*-<task_type>.txt` | Epoch-by-epoch training metrics |
+| `full-*-train.txt` | Metrics evaluated on training set |
+| `full-*-test.txt` | Metrics evaluated on test set |
+| `full-*-all.txt` | Metrics evaluated on all nodes |
+| `best_trial_*.json` | Best hyperparameters from optimization |
 
 
 ## Docker Image
@@ -154,15 +246,115 @@ docker pull ghcr.io/stracquadaniolab/gnn-suite:latest
 
 ## Hyperparameter Optimization with Optuna
 
-To run the hyperparameter optimization workflow using `optuna` defined in `hyperopt.py`, run the hyperparameter optimization workflow:
+To run the hyperparameter optimization workflow using `optuna` defined in `hyperopt.py`:
 
 ```bash
-nextflow run main.nf -profile docker,<experiment_file> -entry hyperopt
+# Binary classification
+nextflow run main.nf -profile docker -entry hyperopt \
+  --geneFile testdata/genes.csv \
+  --networkFile testdata/network.tsv \
+  --task_type binary
+
+# Multiclass classification
+nextflow run main.nf -profile docker -entry hyperopt \
+  --geneFile testdata/sfari_multiclass_genes.csv \
+  --networkFile testdata/sfari_multiclass_network.tsv \
+  --task_type multiclass
+
+# Regression
+nextflow run main.nf -profile docker -entry hyperopt \
+  --geneFile testdata/sfari_regression_genes.csv \
+  --networkFile testdata/sfari_regression_network.tsv \
+  --task_type regression
 ```
 
-The results of the search will be stored in the `results/hyperparameters/<experiment_file>/` directory. You can find the best trial information in the `best_trial_<model>_<experiment>.txt` file.
+### Search Space Configuration
 
-For more information on `optuna`, you can visit the official documentation at [https://optuna.readthedocs.io](https://optuna.readthedocs.io).
+The hyperparameter search space is defined in `conf/hyperparams.yaml`:
+
+| Parameter | Range | Type |
+|-----------|-------|------|
+| `learning_rate` | 0.001 - 0.5 | float (log scale) |
+| `weight_decay` | 0.00001 - 0.5 | float (log scale) |
+| `dropout` | 0.0 - 0.8 | float |
+| `epochs` | 100 - 300 | int |
+
+### Model-Specific Parameters
+
+| Model | Parameter | Range |
+|-------|-----------|-------|
+| GCNII | `alpha` | 0.001 - 10.0 (log scale) |
+| GCNII | `theta` | 0.001 - 10.0 (log scale) |
+| GAT | `num_heads` | [1, 2, 4, 8] |
+
+### Optimization Settings
+
+| Setting | Value |
+|---------|-------|
+| `n_trials` | 5 |
+| `sampler` | TPE |
+
+### Output
+
+The results are stored in `results/hyperparameters/<dataSet>/`:
+- `best_trial_<model>_<dataSet>.json` - Best hyperparameters (auto-loaded during training)
+
+When running the main training workflow, optimized hyperparameters are automatically loaded if available. The pipeline prints `Hyperparameters: Using optimized` or `Hyperparameters: Using defaults` at startup.
+
+For more information on `optuna`, visit the official documentation at [https://optuna.readthedocs.io](https://optuna.readthedocs.io).
+
+
+## MLflow Integration
+
+The pipeline supports [MLflow](https://mlflow.org/) for experiment tracking, metrics logging, and model registry.
+
+### Enabling MLflow
+
+```bash
+# Using SQLite database (recommended)
+nextflow run main.nf -profile docker,test \
+  --with_mlflow true \
+  --mlflow_tracking_uri "sqlite:///mlflow.db"
+
+# Using file-based storage
+nextflow run main.nf -profile docker,test \
+  --with_mlflow true \
+  --mlflow_tracking_uri "file:./mlruns"
+```
+
+### MLflow Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--with_mlflow` | `false` | Enable MLflow tracking |
+| `--mlflow_tracking_uri` | `file:./mlruns` | MLflow tracking URI (`sqlite:///mlflow.db` or `http://localhost:5000`) |
+| `--mlflow_experiment_name` | `gnn-suite-default` | Experiment name in MLflow |
+| `--mlflow_register_model` | `false` | Register trained models in MLflow Model Registry |
+
+### Using a Tracking Server
+
+1. Start the MLflow server using the provided script:
+    ```bash
+    bash mlflow_server.sh
+    ```
+    This starts a server with SQLite backend (`sqlite:///mlflow.db`) and artifact storage (`./mlflow-artifacts`).
+
+2. Run the pipeline with the server URI:
+    ```bash
+    nextflow run main.nf -profile docker,test \
+      --with_mlflow true \
+      --mlflow_tracking_uri "http://localhost:5000"
+    ```
+
+3. View experiments at `http://localhost:5000`
+
+### Logged Metrics
+
+MLflow logs the following metrics per epoch:
+- **Binary/Multiclass**: precision, recall, accuracy, balanced accuracy, F1, AUC
+- **Regression**: MSE, RMSE, MAE, R²
+
+For more information on MLflow, visit the official documentation at [https://mlflow.org/docs](https://mlflow.org/docs/latest/index.html).
 
 
 ## FAQ
