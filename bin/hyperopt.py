@@ -1,22 +1,13 @@
 #!/usr/bin/env python3
-import sys
+import os
+import json
+
 import torch
 import optuna
-sys.path.append('models.py')
 import typer
-import json
 import yaml
 
 from gnn import run
-
-import os
-import sys
-import contextlib
-
-def run_silently(func, *args, **kwargs):
-    with open(os.devnull, 'w') as fnull:
-        with contextlib.redirect_stdout(fnull):
-            return func(*args, **kwargs)
 
 
 def load_hyperparam_config(config_path="conf/hyperparams.yaml"):
@@ -152,12 +143,12 @@ def run_optuna(data_pair, model, task_type='binary', hyperparam_config_path="con
 
     if hyperparam_config and 'optimization' in hyperparam_config:
         n_trials = hyperparam_config['optimization'].get('n_trials', 300)
-        n_jobs = hyperparam_config['optimization'].get('n_jobs', -1)
+        n_jobs = hyperparam_config['optimization'].get('n_jobs', 1)
         sampler_name = hyperparam_config['optimization'].get('sampler', 'TPE')
         pruner_name = hyperparam_config['optimization'].get('pruner', 'MedianPruner')
     else:
         n_trials = 300
-        n_jobs = -1
+        n_jobs = 1
         sampler_name = 'TPE'
         pruner_name = 'MedianPruner'
 
