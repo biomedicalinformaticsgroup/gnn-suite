@@ -155,9 +155,7 @@ class GraphSAGE(torch.nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
         
         x = self.convs[self.num_layers - 1](x, edge_index)
-        x = F.elu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        
+
         return x
 
 
@@ -187,19 +185,22 @@ class GraphIsomorphismNetwork(torch.nn.Module):
                        nn.Linear(num_hidden, num_hidden), nn.ELU())  # ReLU activation
         self.convs.append(GINConv(nn2))
 
-        self.lin1 = nn.Linear(num_hidden*2, num_hidden)
+        self.lin1 = nn.Linear(num_hidden * num_layers, num_hidden)
         self.lin2 = nn.Linear(num_hidden, num_classes)
 
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
 
-        # Node embeddings 
-        h1 = self.convs[0](x, edge_index)
-        h2 = self.convs[1](h1, edge_index)
+        # Node embeddings
+        embeddings = []
+        h = x
+        for conv in self.convs:
+            h = conv(h, edge_index)
+            embeddings.append(h)
 
-        # Concatenate graph embeddings
-        h = torch.cat((h1, h2), dim=1)
+        # Concatenate 
+        h = torch.cat(embeddings, dim=1)
 
         # Classifier
         h = self.lin1(h)
@@ -221,9 +222,9 @@ class GraphTransformer(torch.nn.Module):
         self.dropout = dropout
 
         self.convs.append(TransformerConv(num_features, num_hidden, heads=2))
-        for _ in range(num_layers - 2):  # minus 2 to account for the first and last layers
-            self.convs.append(TransformerConv(num_hidden*2, num_hidden*2, heads=2))  # *2 because of the multi-head attention
-        self.convs.append(TransformerConv(num_hidden*2, num_hidden, heads=2))  # *2 because of the multi-head attention
+        for _ in range(num_layers - 2):
+            self.convs.append(TransformerConv(num_hidden*2, num_hidden, heads=2))
+        self.convs.append(TransformerConv(num_hidden*2, num_hidden, heads=2))
 
         self.lin = nn.Linear(num_hidden*2, num_classes)  # *2 because of the multi-head attention
 
@@ -256,9 +257,8 @@ class GCNII(torch.nn.Module):
         self.layers = torch.nn.ModuleList()
 
         for i in range(num_layers):
-            if theta is None:
-                i = None
-            self.layers.append(GCN2Conv(channels = num_hidden, alpha = alpha, theta = theta, layer=i))
+            layer_idx = None if theta is None else i
+            self.layers.append(GCN2Conv(channels=num_hidden, alpha=alpha, theta=theta, layer=layer_idx))
         
         self.final_lin = nn.Linear(num_hidden, num_classes)
 
