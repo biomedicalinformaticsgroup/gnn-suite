@@ -10,6 +10,7 @@ from sklearn import metrics, model_selection
 import torch
 import torch.nn.functional as F
 from torch_geometric.data import Data
+import optuna
 
 from models import GCN, GAT, HGCN, PHGCN, GraphSAGE, GraphIsomorphismNetwork, GCNII, GraphTransformer
 
@@ -90,10 +91,11 @@ def read_network_file(network_filename, gene_to_id):
     """
 
     edge_matrix = []
-    for row, record in enumerate(csv.reader(open(network_filename), delimiter="\t")):
-        gene_name_1, gene_name_2 = record
-        edge_matrix.append([gene_to_id[gene_name_1], gene_to_id[gene_name_2]])
-        edge_matrix.append([gene_to_id[gene_name_2], gene_to_id[gene_name_1]])
+    with open(network_filename) as f:
+        for row, record in enumerate(csv.reader(f, delimiter="\t")):
+            gene_name_1, gene_name_2 = record
+            edge_matrix.append([gene_to_id[gene_name_1], gene_to_id[gene_name_2]])
+            edge_matrix.append([gene_to_id[gene_name_2], gene_to_id[gene_name_1]])
 
     return edge_matrix
 
@@ -215,7 +217,7 @@ def build_model(name, data, dropout=0.5, alpha=0.1, theta=0.5, num_heads=1, task
     elif name == "gin":
         return GraphIsomorphismNetwork(num_features, num_classes)
     elif name == "gcn2":
-        return GCNII(num_features, num_classes, dropout=dropout, alpha=alpha, theta = None)
+        return GCNII(num_features, num_classes, dropout=dropout, alpha=alpha, theta=theta)
     else:
         return GCN(num_features, num_classes, dropout=dropout)
 
@@ -252,7 +254,7 @@ def evaluate_all(model, data, thq=0.95, task_type='binary'):
 
             try:
                 auc = metrics.roc_auc_score(truth, prob, average="macro", multi_class="ovr")
-            except:
+            except Exception:
                 auc = 0.0
 
             return precision, recall, acc, bacc, f1, auc
@@ -321,7 +323,7 @@ def evaluate_train(model, data, thq=0.95, task_type='binary'):
 
             try:
                 auc = metrics.roc_auc_score(truth, prob, average="macro", multi_class="ovr")
-            except:
+            except Exception:
                 auc = 0.0
 
             return precision, recall, acc, bacc, f1, auc
@@ -391,7 +393,7 @@ def evaluate(model, data, thq=0.95, task_type='binary'):
 
             try:
                 auc = metrics.roc_auc_score(truth, prob, average="macro", multi_class="ovr")
-            except:
+            except Exception:
                 auc = 0.0
 
             return precision, recall, acc, bacc, f1, auc
@@ -563,7 +565,8 @@ def run(
     theta: float = 0.5,
     num_heads: int = 1,
     task_type: str = 'binary',
-    manage_mlflow_run: bool = True
+    manage_mlflow_run: bool = True,
+    trial=None
 ):
     """
     Train a graph neural network.
@@ -703,12 +706,34 @@ def run(
             if WITH_MLFLOW and manage_mlflow_run:
                 mlflow.log_metric("train_loss", float(loss), step=epoch)
 
-            # Evaluate the model and print the results at the specified interval
+            # Evaluate metric at every epoch for accurate max_metric tracking
+            if task_type == 'multiclass':
+                precision, recall, acc, bacc, f1, auc = evaluate(
+                    model, data, eval_threshold, task_type=task_type
+                )
+                metric_array.append(bacc)
+                current_metric = bacc
+            elif task_type == 'regression':
+                mse, rmse, mae, r2 = evaluate(
+                    model, data, eval_threshold, task_type=task_type
+                )
+                metric_array.append(r2)
+                current_metric = r2
+            else:  # binary
+                tn, fp, fn, tp, precision, recall, acc, bacc, auc = evaluate(
+                    model, data, eval_threshold, task_type=task_type
+                )
+                metric_array.append(bacc)
+                current_metric = bacc
+
+            if trial:
+                trial.report(current_metric, epoch)
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
+
+            # Print and log detailed results at the specified interval
             if (epoch % verbose_interval == 0) or (epoch == 1):
                 if task_type == 'multiclass':
-                    precision, recall, acc, bacc, f1, auc = evaluate(
-                        model, data, eval_threshold, task_type=task_type
-                    )
                     precision_train, recall_train, acc_train, bacc_train, f1_train, auc_train = evaluate_train(
                         model, data, eval_threshold, task_type=task_type
                     )
@@ -732,8 +757,6 @@ def run(
                         )
                     )
 
-                    metric_array.append(bacc)
-
                     if WITH_MLFLOW and manage_mlflow_run:
                         mlflow.log_metric("val_precision", precision, step=epoch)
                         mlflow.log_metric("val_recall", recall, step=epoch)
@@ -743,9 +766,6 @@ def run(
                         mlflow.log_metric("val_auc", auc, step=epoch)
 
                 elif task_type == 'regression':
-                    mse, rmse, mae, r2 = evaluate(
-                        model, data, eval_threshold, task_type=task_type
-                    )
                     mse_train, rmse_train, mae_train, r2_train = evaluate_train(
                         model, data, eval_threshold, task_type=task_type
                     )
@@ -769,8 +789,6 @@ def run(
                         )
                     )
 
-                    metric_array.append(r2)
-
                     if WITH_MLFLOW and manage_mlflow_run:
                         mlflow.log_metric("val_mse", mse, step=epoch)
                         mlflow.log_metric("val_rmse", rmse, step=epoch)
@@ -778,9 +796,6 @@ def run(
                         mlflow.log_metric("val_r2", r2, step=epoch)
 
                 else:  # binary
-                    tn, fp, fn, tp, precision, recall, acc, bacc, auc = evaluate(
-                        model, data, eval_threshold, task_type=task_type
-                    )
                     tn_train, fp_train, fn_train, tp_train, precision_train, recall_train, acc_train, bacc_train, auc_train = evaluate_train(
                         model, data, eval_threshold, task_type=task_type
                     )
@@ -803,8 +818,6 @@ def run(
                             epoch, loss, tn_all, fp_all, fn_all, tp_all, precision_all, recall_all, acc_all, bacc_all, auc_all
                         )
                     )
-
-                    metric_array.append(bacc)
 
                     if WITH_MLFLOW and manage_mlflow_run:
                         mlflow.log_metric("val_tn", tn, step=epoch)

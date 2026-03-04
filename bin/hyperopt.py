@@ -1,22 +1,12 @@
 #!/usr/bin/env python3
-import sys
-import torch
-import optuna
-sys.path.append('models.py')
-import typer
+import os
 import json
 import yaml
+import torch
+import optuna
+import typer
 
 from gnn import run
-
-import os
-import sys
-import contextlib
-
-def run_silently(func, *args, **kwargs):
-    with open(os.devnull, 'w') as fnull:
-        with contextlib.redirect_stdout(fnull):
-            return func(*args, **kwargs)
 
 
 def load_hyperparam_config(config_path="conf/hyperparams.yaml"):
@@ -103,7 +93,8 @@ def objective_gnn(trial, model_name, gene_filename, network_filename, num_epochs
         theta= params.get('theta', 0.5),
         num_heads= params.get('num_heads', 1),
         task_type=task_type,
-        manage_mlflow_run=False
+        manage_mlflow_run=False,
+        trial=trial
     )
 
     return max_metric
@@ -136,7 +127,8 @@ def objective_gcn2(trial, model_name, gene_filename, network_filename, num_epoch
         theta= params.get('theta', 0.5),
         num_heads= params.get('num_heads', 1),
         task_type=task_type,
-        manage_mlflow_run=False
+        manage_mlflow_run=False,
+        trial=trial
     )
 
     return max_metric
@@ -163,8 +155,22 @@ def run_optuna(data_pair, model, task_type='binary', hyperparam_config_path="con
 
     num_epochs = 250
 
+    if n_jobs == -1 and torch.cuda.is_available():
+        n_jobs = 1
+        print("Note: Using n_jobs=1 (GPU detected). Set n_jobs explicitly in config to override.")
+
     sampler = optuna.samplers.TPESampler() if sampler_name == 'TPE' else None
-    pruner = optuna.pruners.MedianPruner() if pruner_name == 'MedianPruner' else None
+
+    pruner_map = {
+        'MedianPruner': optuna.pruners.MedianPruner,
+        'PercentilePruner': optuna.pruners.PercentilePruner,
+        'SuccessiveHalvingPruner': optuna.pruners.SuccessiveHalvingPruner,
+        'HyperbandPruner': optuna.pruners.HyperbandPruner,
+        'ThresholdPruner': optuna.pruners.ThresholdPruner,
+        'NopPruner': optuna.pruners.NopPruner,
+    }
+    pruner_class = pruner_map.get(pruner_name)
+    pruner = pruner_class() if pruner_class else None
 
     print(f"\n{'='*60}")
     print(f"Starting hyperparameter optimization for: {model_name}")
