@@ -1,0 +1,15 @@
+\begin{tabular}{lrl}
+\toprule
+model &  epoch &    mean ± std \\
+\midrule
+  gat &    185 & 0.769 ± 0.021 \\
+gat3h &    295 & 0.761 ± 0.033 \\
+  gcn &    143 &  0.777 ± 0.04 \\
+ gcn2 &    296 & 0.807 ± 0.035 \\
+  gin &    293 & 0.796 ± 0.032 \\
+  gtn &     63 & 0.798 ± 0.036 \\
+ hgcn &    243 & 0.802 ± 0.028 \\
+phgcn &    217 & 0.794 ± 0.032 \\
+ sage &    295 & 0.796 ± 0.032 \\
+\bottomrule
+\end{tabular}

@@ -1,0 +1,2 @@
+Error for model 'gtn' with data pair 'string':
+CUDA out of memory. Tried to allocate 102.00 MiB (GPU 0; 5.79 GiB total capacity; 3.70 GiB already allocated; 23.12 MiB free; 4.82 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF

@@ -1,0 +1,6 @@
+Best trial:
+  Value: 0.8913255360623782
+  Params:
+    dropout: 0.49826108662759105
+    learning_rate: 0.002173116845017288
+    weight_decay: 0.009411718120214851

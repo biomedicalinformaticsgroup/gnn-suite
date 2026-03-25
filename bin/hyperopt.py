@@ -78,7 +78,7 @@ def objective_gnn(trial, model_name, gene_filename, network_filename, num_epochs
             'epochs': num_epochs
         }
 
-    max_metric = run(
+    best_score = run(
         gene_filename = gene_filename,
         network_filename = network_filename,
         train_size = 0.8,
@@ -97,7 +97,7 @@ def objective_gnn(trial, model_name, gene_filename, network_filename, num_epochs
         trial=trial
     )
 
-    return max_metric
+    return best_score
 
 def objective_gcn2(trial, model_name, gene_filename, network_filename, num_epochs=300, hyperparam_config=None, task_type='binary'):
     params = suggest_hyperparameters(trial, model_name, hyperparam_config)
@@ -112,7 +112,7 @@ def objective_gcn2(trial, model_name, gene_filename, network_filename, num_epoch
             'epochs': num_epochs
         }
 
-    max_metric = run(
+    best_score = run(
         gene_filename = gene_filename,
         network_filename = network_filename,
         train_size = 0.8,
@@ -131,7 +131,7 @@ def objective_gcn2(trial, model_name, gene_filename, network_filename, num_epoch
         trial=trial
     )
 
-    return max_metric
+    return best_score
 
 
 def run_optuna(data_pair, model, task_type='binary', hyperparam_config_path="conf/hyperparams.yaml"):
@@ -182,7 +182,7 @@ def run_optuna(data_pair, model, task_type='binary', hyperparam_config_path="con
     print(f"Config file: {hyperparam_config_path}")
     print(f"{'='*60}\n")
 
-    direction = "minimize" if task_type == 'regression' else "maximize"
+    direction = "minimize" if task_type == 'regression' else "maximize"  # MSE: minimize, bacc: maximize
     study = optuna.create_study(
         study_name=model_name+"_hp_search",
         direction=direction,
@@ -199,7 +199,8 @@ def run_optuna(data_pair, model, task_type='binary', hyperparam_config_path="con
                                                     hyperparam_config,
                                                     task_type),
                                                 n_jobs=n_jobs,
-                                                n_trials=n_trials)
+                                                n_trials=n_trials,
+                                                show_progress_bar=True)
     else:
         study.optimize(lambda trial: objective_gnn(trial, model_name,
                                                    gene_filename,
@@ -208,7 +209,8 @@ def run_optuna(data_pair, model, task_type='binary', hyperparam_config_path="con
                                                     hyperparam_config,
                                                     task_type),
                                                 n_jobs=n_jobs,
-                                                n_trials=n_trials)
+                                                n_trials=n_trials,
+                                                show_progress_bar=True)
 
     best_trial = study.best_trial
     print(f"\n{'='*60}")

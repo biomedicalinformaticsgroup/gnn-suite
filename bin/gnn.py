@@ -717,8 +717,8 @@ def run(
                 mse, rmse, mae, r2 = evaluate(
                     model, data, eval_threshold, task_type=task_type
                 )
-                metric_array.append(r2)
-                current_metric = r2
+                metric_array.append(mse)
+                current_metric = mse
             else:  # binary
                 tn, fp, fn, tp, precision, recall, acc, bacc, auc = evaluate(
                     model, data, eval_threshold, task_type=task_type
@@ -830,20 +830,24 @@ def run(
                         mlflow.log_metric("val_bacc", bacc, step=epoch)
                         mlflow.log_metric("val_auc", auc, step=epoch)
 
-        max_metric = max(metric_array)
+        if task_type == 'regression':
+            best_metric = min(metric_array)  # For MSE, lower is better
+        else:
+            best_metric = max(metric_array)  # For bacc, higher is better
+
         if WITH_MLFLOW and manage_mlflow_run:
             if task_type == 'multiclass':
-                mlflow.log_metric("final_bacc", max_metric)
+                mlflow.log_metric("final_bacc", best_metric)
                 mlflow.log_metric("final_precision", precision)
                 mlflow.log_metric("final_recall", recall)
                 mlflow.log_metric("final_accuracy", acc)
                 mlflow.log_metric("final_f1", f1)
                 mlflow.log_metric("final_auc", auc)
             elif task_type == 'regression':
-                mlflow.log_metric("final_r2", max_metric)
-                mlflow.log_metric("final_mse", mse)
+                mlflow.log_metric("final_mse", best_metric)
                 mlflow.log_metric("final_rmse", rmse)
                 mlflow.log_metric("final_mae", mae)
+                mlflow.log_metric("final_r2", r2)
             else:  # binary
                 mlflow.log_metric("final_bacc", max_metric)
                 mlflow.log_metric("final_precision", precision)
@@ -861,7 +865,7 @@ def run(
                     model_name_registry
                 )
 
-        return max_metric
+        return best_metric
 
     finally:
         if WITH_MLFLOW and start_run:
