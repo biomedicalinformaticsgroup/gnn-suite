@@ -1,11 +1,52 @@
-name: base
+name: gnn-suite-test
 channels:
-  - defaults
-  - bioconda
+  - pytorch
+  - pyg
   - conda-forge
+  - defaults
 dependencies:
-  - typer
-  - black
+  # Core Python
+  - python=3.10
+  
+  # PyTorch and CUDA support
+  - pytorch
+  - pytorch-cuda=11.8
+  - torchvision
+  - torchaudio
+  
+  # PyTorch Geometric
+  - pyg
+  - torch-scatter
+  - torch-sparse
+  - torch-cluster
+  - torch-spline-conv
+  
+  # ML/Data Science
+  - scikit-learn
+  - numpy
+  - pandas
+  
+  # Visualization
   - seaborn
+  - matplotlib
+  
+  # CLI and utilities
+  - typer
+  - pyyaml
+  
+  # Hyperparameter optimization
+  - optuna
+  
+  # MLflow for experiment tracking
+  - mlflow
+  
+  # Development tools
+  - black
   - pylint
+  
+  # Jupyter support (optional, for notebooks)
+  - jupyter
+  - ipykernel
+  
+  # Version control
   - git
