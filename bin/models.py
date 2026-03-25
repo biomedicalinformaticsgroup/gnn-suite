@@ -257,7 +257,7 @@ class GCNII(torch.nn.Module):
         self.layers = torch.nn.ModuleList()
 
         for i in range(num_layers):
-            layer_idx = None if theta is None else i
+            layer_idx = None if theta is None else (i + 1)
             self.layers.append(GCN2Conv(channels=num_hidden, alpha=alpha, theta=theta, layer=layer_idx))
         
         self.final_lin = nn.Linear(num_hidden, num_classes)
