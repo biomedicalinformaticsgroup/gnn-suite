@@ -7,6 +7,7 @@
 
 ![](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
 ![](https://img.shields.io/badge/Docker-2CA5E0?style=for-the-badge&logo=docker&logoColor=white)
+![](https://img.shields.io/badge/MLflow-0194E2?style=for-the-badge&logo=mlflow&logoColor=white)
 
 GNN-Suite is a robust and modular framework for constructing and benchmarking Graph Neural Network (GNN) architectures for computational biology applications. Built on the [Nextflow](https://www.nextflow.io/) scientific workflow system, it standardises experimentation and reproducibility for evaluating GNN model performance.
 
