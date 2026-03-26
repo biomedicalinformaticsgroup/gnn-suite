@@ -849,7 +849,7 @@ def run(
                 mlflow.log_metric("final_mae", mae)
                 mlflow.log_metric("final_r2", r2)
             else:  # binary
-                mlflow.log_metric("final_bacc", max_metric)
+                mlflow.log_metric("final_bacc", best_metric)
                 mlflow.log_metric("final_precision", precision)
                 mlflow.log_metric("final_recall", recall)
                 mlflow.log_metric("final_accuracy", acc)

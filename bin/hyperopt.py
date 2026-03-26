@@ -258,5 +258,7 @@ def run_hyperopt(
 
 if __name__ == "__main__":
     typer.run(run_hyperopt)
+    torch.cuda.empty_cache()
+
     
 
