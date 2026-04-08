@@ -128,7 +128,7 @@ jobs:
             --geneFile testdata/genes.csv \
             --networkFile testdata/network.tsv \
             --dataSet testdata-binary-hyperopt \
-            --models '["gcn"]'
+            --models gcn
 
       - name: Hyperopt Test - Multiclass Classification
         run: |
@@ -137,7 +137,7 @@ jobs:
             --geneFile testdata/sfari_multiclass_genes.csv \
             --networkFile testdata/sfari_multiclass_network.tsv \
             --dataSet sfari-multiclass-hyperopt \
-            --models '["gcn"]'
+            --models gcn
 
       - name: Hyperopt Test - Regression
         run: |
@@ -146,7 +146,7 @@ jobs:
             --geneFile testdata/sfari_regression_genes.csv \
             --networkFile testdata/sfari_regression_network.tsv \
             --dataSet sfari-regression-hyperopt \
-            --models '["gcn"]'
+            --models gcn
 
       - name: Verify Hyperopt outputs
         run: |
