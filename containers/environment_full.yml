@@ -1,32 +1,40 @@
 name: base
 channels:
-  - defaults
-  - bioconda
+  - pytorch
   - conda-forge
+  - defaults
 dependencies:
+  # Core Python
+  - python=3.10
+
+  # PyTorch provided by base image (pytorch/pytorch:latest)
 
   # ML/Data Science
   - scikit-learn
   - numpy
   - pandas
-
+  
   # Visualization
   - seaborn
   - matplotlib
-
+  
   # CLI and utilities
   - typer
   - pyyaml
-
+  
   # Hyperparameter optimization
   - optuna
-
+  
   # MLflow for experiment tracking
   - mlflow
-
+  
   # Development tools
   - black
   - pylint
-
+  
+  # Jupyter support (optional, for notebooks)
+  - jupyter
+  - ipykernel
+  
   # Version control
   - git

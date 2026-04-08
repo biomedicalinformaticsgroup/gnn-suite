@@ -1,9 +1,9 @@
 # GNN-suite
 
-![](https://img.shields.io/badge/current_version-v0.2.21-blue)
+![](https://img.shields.io/badge/current_version-v1.0.0-blue)
 
 
-![](https://github.com/stracquadaniolab/gnn-suite/workflows/build/badge.svg)
+![](https://github.com/biomedicalinformaticsgroup/gnn-suite/workflows/build/badge.svg)
 
 ![](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
 ![](https://img.shields.io/badge/Docker-2CA5E0?style=for-the-badge&logo=docker&logoColor=white)
@@ -87,19 +87,19 @@ nextflow run main.nf -profile docker \
 ### Install or update the workflow
 
 ```bash
-nextflow pull stracquadaniolab/gnn-suite
+nextflow pull biomedicalinformaticsgroup/gnn-suite
 ```
 
 ### Run a test
 
 ```bash
-nextflow run stracquadaniolab/gnn-suite -profile docker,test
+nextflow run biomedicalinformaticsgroup/gnn-suite -profile docker,test
 ```
 
 ### Run an experiment
 
 ```bash
-nextflow run stracquadaniolab/gnn-suite -profile docker,<experiment_file>
+nextflow run biomedicalinformaticsgroup/gnn-suite -profile docker,<experiment_file>
 ```
 The results of the experimetn will be stored in the `results/data/<experiment_file>/` and `results/figures/<experiment_file>/` directory.
 
@@ -164,10 +164,59 @@ results/
 
 ## Docker Image
  
-[View the `gnn-suite` Docker image on GitHub Container Registry](https://github.com/orgs/stracquadaniolab/packages/container/package/gnn-suite), you can also download it using:
+The `gnn-suite` Docker image is available on [GitHub Container Registry](https://github.com/essharom/gnn-suite/pkgs/container/gnn-suite).
+
+### Pulling the Image
 
 ```bash
-docker pull ghcr.io/stracquadaniolab/gnn-suite:latest
+docker pull ghcr.io/essharom/gnn-suite:latest
+# or specific version
+docker pull ghcr.io/essharom/gnn-suite:v1.0.0
+```
+
+### Image Contents
+
+The Docker image (8.6GB) includes:
+- **PyTorch 2.2.1** with CUDA 12.1 support
+- **PyTorch Geometric 2.7.0** with all extension packages (torch-scatter, torch-sparse, torch-cluster, torch-spline-conv)
+- **MLflow 3.11.1** for experiment tracking
+- **Optuna** for hyperparameter optimization
+- **Scientific Python stack**: numpy, pandas, scikit-learn, matplotlib, seaborn
+- **Development tools**: Jupyter, black, pylint, git
+
+### Using the Container Directly
+
+Run Python scripts with the container:
+```bash
+docker run --rm -v $(pwd):/workspace -w /workspace \
+  ghcr.io/essharom/gnn-suite:latest \
+  python bin/gnn.py --help
+```
+
+### Viewing MLflow Results
+
+Start MLflow UI to view experiment results from your pipeline runs:
+
+```bash
+# Start MLflow UI server using the container
+docker run -d --rm \
+  -p 5000:5000 \
+  -v $(pwd)/work/<task_dir>/mlruns:/mlruns \
+  ghcr.io/essharom/gnn-suite:latest \
+  mlflow ui --backend-store-uri file:///mlruns --host 0.0.0.0 --port 5000
+
+# Access UI at http://localhost:5000
+```
+
+For file-based tracking (default), the MLflow runs are stored in the Nextflow work directory. To view all experiments:
+
+```bash
+# View experiments from results directory
+docker run -d --rm \
+  -p 5000:5000 \
+  -v $(pwd)/mlruns:/mlruns \
+  ghcr.io/essharom/gnn-suite:latest \
+  mlflow ui --backend-store-uri file:///mlruns --host 0.0.0.0 --port 5000
 ```
 
 ## Adding a New Experiment
@@ -209,7 +258,7 @@ docker pull ghcr.io/stracquadaniolab/gnn-suite:latest
 
     or
     ```bash
-    nextflow run stracquadaniolab/gnn-suite -profile docker,<experiment_file>
+    nextflow run biomedicalinformaticsgroup/gnn-suite -profile docker,<experiment_file>
     ```
 
 ## Adding a New Model

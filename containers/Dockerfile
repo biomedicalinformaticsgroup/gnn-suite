@@ -2,18 +2,17 @@
 
 FROM pytorch/pytorch:latest
 
-LABEL org.opencontainers.image.title="pytorch-geometric"
-LABEL org.opencontainers.image.description="A Docker image with a full pytorch-geometric installation and support for CUDA (cu101)"
-LABEL org.opencontainers.image.url="https://github.com/stracquadaniolab/docker-pytorch-geometric"
-LABEL org.opencontainers.image.documentation="https://github.com/stracquadaniolab/docker-pytorch-geometric"
-LABEL org.opencontainers.image.source="https://github.com/stracquadaniolab/docker-pytorch-geometric"
-LABEL org.opencontainers.image.revision="v0.2.21"
-LABEL org.opencontainers.image.vendor="stracquadaniolab"
+LABEL org.opencontainers.image.title="gnn-suite"
+LABEL org.opencontainers.image.description="A comprehensive GNN framework with PyTorch Geometric and CUDA 12.1 support"
+LABEL org.opencontainers.image.url="https://github.com/biomedicalinformaticsgroup/gnn-suite"
+LABEL org.opencontainers.image.documentation="https://github.com/biomedicalinformaticsgroup/gnn-suite"
+LABEL org.opencontainers.image.source="https://github.com/biomedicalinformaticsgroup/gnn-suite"
+LABEL org.opencontainers.image.revision="v1.0.0"
+LABEL org.opencontainers.image.vendor="biomedicalinformaticsgroup"
 LABEL org.opencontainers.image.authors="Giovanni Stracquadanio"
 
 USER root
 WORKDIR /
-ARG CONDA_FILE=containers/environment.yml
 ARG PACKAGE_FILE=containers/pkg.list
 
 # copy package list
@@ -26,13 +25,25 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install PyTorch Geometric and extension packages
+RUN TORCH_VERSION=$(python -c "import torch; print(torch.__version__.split('+')[0])") && \
+    CUDA_VERSION=$(python -c "import torch; print('cu' + torch.version.cuda.replace('.', ''))") && \
+    pip install --no-cache-dir torch-geometric && \
+    pip install --no-cache-dir torch-scatter torch-sparse torch-cluster torch-spline-conv \
+        -f https://data.pyg.org/whl/torch-${TORCH_VERSION}+${CUDA_VERSION}.html
 
-COPY ${CONDA_FILE} environment.yml
-RUN conda env update -n base --file environment.yml && conda clean --all --yes 
-
+# Install other Python packages
+RUN pip install --no-cache-dir \
+    scikit-learn numpy pandas \
+    seaborn matplotlib \
+    typer pyyaml \
+    optuna \
+    mlflow \
+    black pylint \
+    jupyter ipykernel
 
 # Add Tini
-ENV TINI_VERSION v0.19.0
+ENV TINI_VERSION=v0.19.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 RUN chmod +x /tini
 
@@ -41,14 +52,11 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64
 ENV CPATH=/usr/local/cuda/include:/usr/local/cuda/compat
 ENV CUDA_HOME=/usr/local/cuda
 
-ENV CUDA=cu101
+ENV CUDA=cu118
 RUN mkdir -p /usr/local/cuda/
 RUN cd /usr/local/cuda/ && ln -s /usr/local/cuda/compat/libnvidia-* .
 
-# installing pytorch geometric and its requirements
-RUN conda install pyg -c pyg
-
-
+# Legacy pip installation method (now using pip install above after conda)
 #RUN pip install torch-scatter \
 #    && pip install torch-sparse \
 #    && pip install torch-cluster \
