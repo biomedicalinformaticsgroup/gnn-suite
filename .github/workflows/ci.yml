@@ -113,11 +113,13 @@ jobs:
       - name: Verify MLflow outputs
         run: |
           echo "Checking MLflow outputs..."
-          ls -lh mlruns/ || echo "No mlruns directory"
-          if [ ! -d "mlruns" ]; then
+          MLRUNS_DIR=$(find work -name "mlruns" -type d 2>/dev/null | head -1)
+          if [ -z "$MLRUNS_DIR" ]; then
             echo "ERROR: MLflow tracking directory not created"
             exit 1
           fi
+          echo "Found MLflow directory: $MLRUNS_DIR"
+          ls -lh "$MLRUNS_DIR"
 
       - name: Hyperopt Test - Binary Classification
         run: |
@@ -178,7 +180,6 @@ jobs:
           name: test-results
           path: |
             results/
-            mlruns/
-            mlflow.db
+            work/**/mlruns/
             .nextflow.log
           retention-days: 30
