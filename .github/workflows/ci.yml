@@ -19,7 +19,7 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Pull pre-built Docker image
-        run: docker pull ghcr.io/${{ github.repository }}:latest
+        run: docker pull ghcr.io/essharom/gnn-suite:latest
 
       - name: Cache Nextflow and setup installation
         id: nextflow-cache
@@ -180,7 +180,7 @@ jobs:
 
       - name: Upload Test Artifacts
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: |
