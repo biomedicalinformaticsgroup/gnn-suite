@@ -67,7 +67,7 @@ jobs:
       - name: Integration Test - Binary Classification
         run: |
           nextflow run . -profile test,ci,docker \
-            --task-type binary \
+            --task_type binary \
             --geneFile testdata/genes.csv \
             --networkFile testdata/network.tsv \
             --dataSet testdata-binary \
@@ -78,7 +78,7 @@ jobs:
       - name: Integration Test - Multiclass Classification
         run: |
           nextflow run . -profile test,ci,docker \
-            --task-type multiclass \
+            --task_type multiclass \
             --geneFile testdata/sfari_multiclass_genes.csv \
             --networkFile testdata/sfari_multiclass_network.tsv \
             --dataSet testdata-multiclass \
@@ -89,7 +89,7 @@ jobs:
       - name: Integration Test - Regression
         run: |
           nextflow run . -profile test,ci,docker \
-            --task-type regression \
+            --task_type regression \
             --geneFile testdata/sfari_regression_genes.csv \
             --networkFile testdata/sfari_regression_network.tsv \
             --dataSet testdata-regression \
@@ -100,7 +100,7 @@ jobs:
       - name: Integration Test - MLflow Enabled
         run: |
           nextflow run . -profile test,ci,docker \
-            --task-type binary \
+            --task_type binary \
             --geneFile testdata/genes.csv \
             --networkFile testdata/network.tsv \
             --dataSet testdata-mlflow \
