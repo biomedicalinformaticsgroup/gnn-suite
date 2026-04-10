@@ -21,7 +21,7 @@ default:
 
   epochs:
     type: int
-    low: 100
+    low: 40
     high: 300
     default: 250
 
