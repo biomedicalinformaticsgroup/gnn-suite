@@ -65,14 +65,14 @@ nextflow run main.nf -profile docker,test --task_type binary
 
 # Multiclass classification
 nextflow run main.nf -profile docker \
-  --geneFile testdata/multiclass.csv \
-  --networkFile testdata/multiclass_network.tsv \
+  --geneFile testdata/sfari_multiclass_genes.csv \
+  --networkFile testdata/sfari_multiclass_network.tsv \
   --task_type multiclass
 
 # Regression
 nextflow run main.nf -profile docker \
-  --geneFile testdata/regression.csv \
-  --networkFile testdata/regression_network.tsv \
+  --geneFile testdata/sfari_regression_genes.csv \
+  --networkFile testdata/sfari_regression_network.tsv \
   --task_type regression
 ```
 
@@ -130,7 +130,7 @@ For more information on `Nextflow`, you can visit the official documentation at 
 | `--verbose_interval` | `10` | Logging interval (epochs) |
 | `--dropout` | `0.2` | Dropout rate |
 | `--alpha` | `0.1` | Alpha parameter (GCNII) |
-| `--theta` | `0` | Theta parameter (GCNII) |
+| `--theta` | `1` | Theta parameter (GCNII) |
 | `--num_heads` | `1` | Number of attention heads (GAT) |
 | `--task_type` | `binary` | Task type: `binary`, `multiclass`, `regression` |
 
@@ -164,7 +164,7 @@ results/
 
 ## Docker Image
  
-The `gnn-suite` Docker image is available on [GitHub Container Registry](https://github.com/essharom/gnn-suite/pkgs/container/gnn-suite).
+The `gnn-suite` Docker image is available on [GitHub Container Registry](https://github.com/users/essharom/packages/container/package/gnn-suite).
 
 ### Pulling the Image
 
@@ -253,7 +253,7 @@ docker run -d --rm \
 
 3. **Run the Experiment**: Execute the pipeline with the new profile using:
     ```bash
-    nextflow run main.nf -profile docker, <experiment_file>
+    nextflow run main.nf -profile docker,<experiment_file>
     ```
 
     or
@@ -302,14 +302,14 @@ nextflow run main.nf -profile docker -entry hyperopt \
 
 # Multiclass classification
 nextflow run main.nf -profile docker -entry hyperopt \
-  --geneFile testdata/genes.csv \
-  --networkFile testdata/multiclass_network.tsv \
+  --geneFile testdata/sfari_multiclass_genes.csv \
+  --networkFile testdata/sfari_multiclass_network.tsv \
   --task_type multiclass
 
 # Regression
 nextflow run main.nf -profile docker -entry hyperopt \
-  --geneFile testdata/genes.csv \
-  --networkFile testdata/regression_network.tsv \
+  --geneFile testdata/sfari_regression_genes.csv \
+  --networkFile testdata/sfari_regression_network.tsv \
   --task_type regression
 ```
 
